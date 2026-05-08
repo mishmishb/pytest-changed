@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome if they keep the core promise: convention-first source→test discovery, explicit overrides where needed, and no hidden dependency database.
+Contributions are welcome if they keep the core promise: staged-file-aware pre-commit test selection, convention-first source→test discovery, explicit overrides where needed, and no hidden state.
 
 ## Development setup
 

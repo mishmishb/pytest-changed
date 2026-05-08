@@ -1,6 +1,6 @@
 - id: pytest-changed
   name: pytest-changed
-  description: Run pytest tests that conventionally match changed Python source files.
+  description: Run pytest for tests related to staged Python files in pre-commit.
   entry: pytest-changed
   language: python
   types_or: [python]

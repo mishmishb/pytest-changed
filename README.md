@@ -1,6 +1,8 @@
 # pytest-changed
 
-Run pytest tests that conventionally match changed Python files.
+Run pytest for tests related to staged Python files in pre-commit.
+
+`pytest-changed` is a small, deterministic selector for commit-time feedback. It takes the Python filenames passed in by pre-commit, turns source-file changes into test-file paths using simple conventions, applies optional explicit overrides, and runs pytest on the resulting test files.
 
 If `src/foo/bar.py` changes, `pytest-changed` looks for:
 
@@ -9,9 +11,16 @@ If `src/foo/bar.py` changes, `pytest-changed` looks for:
 
 Any changed test file under your configured test roots is always run directly.
 
-## Why
+## What it is for
 
-Running the full suite on every commit is slow. `pytest-picked` focuses on changed test files. `pytest-testmon` uses runtime tracing and a stored dependency database. **pytest-changed** sits in the middle: convention-based, stateless, pre-commit-friendly source→test selection with optional explicit overrides.
+Use `pytest-changed` when you want a staged-file-aware pre-commit hook that:
+
+- runs fast enough to sit on the commit path
+- behaves predictably from filenames alone
+- is easy to debug when selection looks wrong
+- does not rely on stored state, import graphs, or runtime tracing
+
+This tool is intentionally file-level and convention-driven. It is for commit-time test selection, not whole-project impact analysis.
 
 ## Install
 
@@ -163,35 +172,24 @@ The canonical table name is hyphenated (`pytest-changed`) because it matches the
 8. Runs `python -m pytest <selected tests> <pytest_args>`
 9. Returns exit code `0` if no tests match, or if pytest exits with code `5` (`no tests collected`)
 
-## Relationship to pytest and testmon
-
-The goal is to feel like pytest with one extra selection layer, but the current release is still a small wrapper that selects test files before invoking pytest.
-
-Compared with nearby tools:
-
-- `pytest-picked` — changed test files
-- `pytest-testmon` — coverage/runtime-traced affected tests using stored state
-- `pytest-changed` — convention-based source→test discovery with optional explicit overrides
-
-A deeper pytest-like interface is best implemented as a plugin, not a patch to pytest core.
-
-## Roadmap and limits
+## Scope and limits
 
 These are current scope boundaries, not laws of nature:
 
-- **Full pytest CLI parity** — likely better as a pytest plugin (`pytest --changed`)
-- **Import-graph selection** — possible, but riskier than simple naming conventions
-- **Coverage/test-trace selection** — already served better by `pytest-testmon`
-- **Class/function-level selection** — possible later, but file-level selection is the current model
+- **Staged filenames in, test files out** — the current contract is commit-time file selection
+- **File-level selection** — it selects test files, not individual test functions or classes
+- **No hidden state** — no database, baseline run, or runtime trace cache
+- **No dependency graph inference** — selection is based on configured conventions and explicit overrides
+- **CI still matters** — this speeds up local commit feedback; it does not replace the full suite
 
 ## Design principles
 
+- **Pre-commit first** — designed around staged filenames passed by the hook
 - **Convention first** — useful with minimal config
 - **Explicit overrides when needed** — config is the escape hatch, not the baseline
 - **Changed tests always run** — edited tests do not need source mapping
 - **Warnings over silent misses** — unmatched sources should be visible
-- **Stateless local feedback** — no database or initial traced full run
-- **CI still matters** — this speeds up local feedback; it does not replace full-suite CI
+- **Deterministic local feedback** — selection should be understandable from paths alone
 
 ## License
 

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "pytest-changed"
 dynamic = ["version"]
-description = "Run pytest tests for changed Python files using convention-based source→test discovery."
+description = "Run pytest for tests related to staged Python files in pre-commit."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
