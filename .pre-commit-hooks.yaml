@@ -1,0 +1,8 @@
+- id: pytest-changed
+  name: pytest-changed
+  description: Run pytest tests mapped to changed Python source files.
+  entry: pytest-changed
+  language: python
+  types_or: [python]
+  pass_filenames: true
+  always_run: false
