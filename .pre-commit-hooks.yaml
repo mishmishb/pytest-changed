@@ -1,6 +1,6 @@
 - id: pytest-changed
   name: pytest-changed
-  description: Run pytest tests mapped to changed Python source files.
+  description: Run pytest tests that conventionally match changed Python source files.
   entry: pytest-changed
   language: python
   types_or: [python]

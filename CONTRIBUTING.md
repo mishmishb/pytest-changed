@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome if they keep the core promise: explicit, predictable source→test mapping with no surprise heuristics enabled by default.
+Contributions are welcome if they keep the core promise: convention-first source→test discovery, explicit overrides where needed, and no hidden dependency database.
 
 ## Development setup
 

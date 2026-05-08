@@ -1,75 +1,108 @@
-"""Tests for pytest_changed.mapper — the core source→test mapping logic."""
+"""Tests for pytest_changed.mapper — source→test discovery and overrides."""
+
+from pathlib import Path
 
 from pytest_changed.mapper import target_tests
 
 
 class TestTargetTests:
-    """Core mapping logic — given changed files and a mapping dict, return test files to run."""
+    """Core mapping logic — given changed files, discover test files to run."""
 
-    def test_empty_changed_returns_empty(self):
-        """Empty changed set returns empty test set."""
-        assert target_tests(set(), {}) == set()
+    def test_empty_changed_returns_empty_result(self, tmp_path: Path):
+        result = target_tests(set(), {}, tmp_path)
+        assert result.tests == set()
+        assert result.unmatched_sources == set()
 
-    def test_non_python_files_ignored(self):
-        """Only .py files are considered. Non-Python extensions are skipped."""
+    def test_non_python_files_ignored(self, tmp_path: Path):
         changed = {"README.md", "pyproject.toml", "src/config.yaml"}
-        mapping = {"src/config.yaml": ["tests/test_config.py"]}
-        assert target_tests(changed, mapping) == set()
+        result = target_tests(changed, {}, tmp_path)
+        assert result.tests == set()
+        assert result.unmatched_sources == set()
 
-    def test_source_file_maps_to_single_test(self):
-        """A changed source file with a mapping returns its mapped test file."""
+    def test_source_file_discovers_nested_convention_match(self, tmp_path: Path):
+        _write(tmp_path, "tests/foo/test_bar.py")
+
+        result = target_tests({"src/foo/bar.py"}, {}, tmp_path)
+
+        assert result.tests == {"tests/foo/test_bar.py"}
+        assert result.unmatched_sources == set()
+
+    def test_source_file_discovers_flat_convention_match(self, tmp_path: Path):
+        _write(tmp_path, "tests/test_bar.py")
+
+        result = target_tests({"src/foo/bar.py"}, {}, tmp_path)
+
+        assert result.tests == {"tests/test_bar.py"}
+        assert result.unmatched_sources == set()
+
+    def test_source_file_includes_all_existing_convention_matches(self, tmp_path: Path):
+        _write(tmp_path, "tests/foo/test_bar.py")
+        _write(tmp_path, "tests/test_bar.py")
+
+        result = target_tests({"src/foo/bar.py"}, {}, tmp_path)
+
+        assert result.tests == {"tests/foo/test_bar.py", "tests/test_bar.py"}
+        assert result.unmatched_sources == set()
+
+    def test_explicit_mapping_overrides_convention_discovery(self, tmp_path: Path):
+        _write(tmp_path, "tests/test_core.py")
+        _write(tmp_path, "tests/custom/test_special_core.py")
+        mapping = {"src/core.py": ["tests/custom/test_special_core.py"]}
+
+        result = target_tests({"src/core.py"}, mapping, tmp_path)
+
+        assert result.tests == {"tests/custom/test_special_core.py"}
+        assert result.unmatched_sources == set()
+
+    def test_multiple_sources_deduplicate_tests(self, tmp_path: Path):
+        _write(tmp_path, "tests/test_shared.py")
+        result = target_tests({"src/pkg/shared.py", "src/other/shared.py"}, {}, tmp_path)
+        assert result.tests == {"tests/test_shared.py"}
+
+    def test_changed_test_file_always_included(self, tmp_path: Path):
+        _write(tmp_path, "tests/test_new.py")
+        result = target_tests({"tests/test_new.py"}, {}, tmp_path)
+        assert result.tests == {"tests/test_new.py"}
+
+    def test_changed_test_with_mapping_not_duplicated(self, tmp_path: Path):
+        _write(tmp_path, "tests/test_core.py")
         mapping = {"src/core.py": ["tests/test_core.py"]}
-        assert target_tests({"src/core.py"}, mapping) == {"tests/test_core.py"}
+        result = target_tests({"src/core.py", "tests/test_core.py"}, mapping, tmp_path)
+        assert result.tests == {"tests/test_core.py"}
 
-    def test_source_file_maps_to_multiple_tests(self):
-        """A source file can map to multiple test files — all are returned."""
-        mapping = {"src/db.py": ["tests/test_db.py", "tests/test_db_integration.py"]}
-        result = target_tests({"src/db.py"}, mapping)
-        assert result == {"tests/test_db.py", "tests/test_db_integration.py"}
+    def test_unknown_source_is_reported_as_unmatched(self, tmp_path: Path):
+        result = target_tests({"src/unknown.py"}, {}, tmp_path)
+        assert result.tests == set()
+        assert result.unmatched_sources == {"src/unknown.py"}
 
-    def test_multiple_sources_deduplicate_tests(self):
-        """When two source files map to the same test, it's only returned once."""
-        mapping = {
-            "src/a.py": ["tests/test_shared.py"],
-            "src/b.py": ["tests/test_shared.py"],
-        }
-        result = target_tests({"src/a.py", "src/b.py"}, mapping)
-        assert result == {"tests/test_shared.py"}
+    def test_mixed_changed_files(self, tmp_path: Path):
+        _write(tmp_path, "tests/test_core.py")
+        _write(tmp_path, "tests/utils/test_helpers.py")
+        _write(tmp_path, "tests/test_helpers.py")
+        _write(tmp_path, "tests/test_new.py")
 
-    def test_changed_test_file_always_included(self):
-        """A changed file under tests/ is always included, even without a mapping."""
-        result = target_tests({"tests/test_new.py"}, {})
-        assert result == {"tests/test_new.py"}
-
-    def test_changed_test_with_mapping_not_duplicated(self):
-        """If a test file is both changed and mapped from a source, it appears once."""
-        mapping = {"src/core.py": ["tests/test_core.py"]}
-        result = target_tests({"src/core.py", "tests/test_core.py"}, mapping)
-        assert result == {"tests/test_core.py"}
-
-    def test_unknown_source_silently_ignored(self):
-        """Source files with no mapping entry are silently skipped."""
-        mapping = {"src/known.py": ["tests/test_known.py"]}
-        result = target_tests({"src/unknown.py"}, mapping)
-        assert result == set()
-
-    def test_mixed_changed_files(self):
-        """Integration: mix of mapped sources, unmapped sources, test files, and non-Python."""
-        mapping = {
-            "src/core.py": ["tests/test_core.py"],
-            "src/utils.py": ["tests/test_utils.py", "tests/test_utils_edge.py"],
-        }
+        mapping = {"src/override.py": ["tests/test_core.py"]}
         changed = {
-            "src/core.py",  # mapped
-            "src/utils.py",  # mapped to 2 files
-            "src/unknown.py",  # no mapping
-            "tests/test_new.py",  # auto-included
-            "README.md",  # non-Python
+            "src/core.py",
+            "src/utils/helpers.py",
+            "src/override.py",
+            "src/unknown.py",
+            "tests/test_new.py",
+            "README.md",
         }
-        result = target_tests(changed, mapping)
-        assert result == {
+        result = target_tests(changed, mapping, tmp_path)
+        assert result.tests == {
             "tests/test_core.py",
-            "tests/test_utils.py",
-            "tests/test_utils_edge.py",
+            "tests/utils/test_helpers.py",
+            "tests/test_helpers.py",
             "tests/test_new.py",
         }
+        assert result.unmatched_sources == {"src/unknown.py"}
+
+
+def _write(
+    root: Path, relative_path: str, content: str = "def test_pass(): assert True\n"
+) -> None:
+    path = root / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)

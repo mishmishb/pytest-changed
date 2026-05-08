@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+from pathlib import Path
 
 PYTEST_NO_TESTS = 5  # exit code for "no tests collected"
 
@@ -24,13 +25,14 @@ def run_pytest(test_files: set[str], pytest_args: list[str] | None = None) -> in
     return result.returncode
 
 
-def main() -> int:
-    """CLI entry point. Receives filenames from pre-commit or manual invocation.
+def _warn_unmatched(unmatched_sources: set[str]) -> None:
+    for path in sorted(unmatched_sources):
+        print(f"pytest-changed: no matching tests found for {path}", file=sys.stderr)
 
-    Reads mapping config from pyproject.toml, maps staged files to test files,
-    and runs pytest on the result.
-    """
-    from pytest_changed.config import load_mapping, load_pytest_args
+
+def main() -> int:
+    """CLI entry point. Receives filenames from pre-commit or manual invocation."""
+    from pytest_changed.config import load_settings
     from pytest_changed.mapper import target_tests
 
     if len(sys.argv) < 2:
@@ -41,13 +43,20 @@ def main() -> int:
     if not py_files:
         return 0
 
-    mapping = load_mapping()
-    tests = target_tests(py_files, mapping)
-    if not tests:
+    settings = load_settings()
+    selection = target_tests(
+        py_files,
+        settings.mapping,
+        Path.cwd(),
+        settings.source_roots,
+        settings.test_roots,
+    )
+    if settings.warn_on_missing and selection.unmatched_sources:
+        _warn_unmatched(selection.unmatched_sources)
+    if not selection.tests:
         return 0
 
-    pytest_args = load_pytest_args()
-    return run_pytest(tests, pytest_args)
+    return run_pytest(selection.tests, settings.pytest_args)
 
 
 if __name__ == "__main__":

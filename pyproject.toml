@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "pytest-changed"
 dynamic = ["version"]
-description = "Run only the pytest tests mapped to staged source files. Explicit mapping, no heuristics."
+description = "Run pytest tests for changed Python files using convention-based source→test discovery."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
@@ -74,8 +74,11 @@ version-file = "src/pytest_changed/_version.py"
 
 [tool.pytest-changed]
 pytest_args = ["-q"]
+source_roots = ["src"]
+test_roots = ["tests"]
+warn_on_missing = true
 
 [tool.pytest-changed.mapping]
-# Add your source→test mappings here. Example:
+# Optional explicit overrides. Example:
 # "src/my_module.py" = ["tests/test_my_module.py"]
 # "src/utils/helpers.py" = ["tests/utils/test_helpers.py"]

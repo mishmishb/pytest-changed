@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from pytest_changed.config import load_mapping, load_pytest_args
+from pytest_changed.config import load_mapping, load_pytest_args, load_settings
 
 
 class TestLoadMapping:
@@ -144,6 +144,33 @@ pytest_args = ["-q", "--disable-warnings"]
         result = load_pytest_args(tmp_path / "different-root")
 
         assert result == ["-q", "--disable-warnings"]
+
+
+class TestLoadSettings:
+    """Loading non-pytest-arg settings for discovery behaviour."""
+
+    def test_defaults_source_roots_test_roots_and_warning(self):
+        pyproject = """
+[tool.pytest-changed]
+"""
+        with _temp_pyproject(pyproject) as root:
+            result = load_settings(root)
+            assert result.source_roots == ["src"]
+            assert result.test_roots == ["tests"]
+            assert result.warn_on_missing is True
+
+    def test_loads_custom_roots_and_warning_flag(self):
+        pyproject = """
+[tool.pytest-changed]
+source_roots = ["lib", "pkg"]
+test_roots = ["spec", "tests"]
+warn_on_missing = false
+"""
+        with _temp_pyproject(pyproject) as root:
+            result = load_settings(root)
+            assert result.source_roots == ["lib", "pkg"]
+            assert result.test_roots == ["spec", "tests"]
+            assert result.warn_on_missing is False
 
 
 def _temp_pyproject(content: str) -> tempfile.TemporaryDirectory:

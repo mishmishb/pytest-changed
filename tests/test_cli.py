@@ -55,9 +55,8 @@ class TestMain:
         monkeypatch.setattr(sys, "argv", ["pytest-changed", "README.md", "pyproject.toml"])
         assert main() == 0
 
-    def test_source_with_mapping_runs_test(self, tmp_path: Path, monkeypatch):
-        """When a staged source file has a mapping, the mapped test is run."""
-        # Set up a pretend project with pyproject.toml and a passing test
+    def test_source_with_convention_match_runs_test(self, tmp_path: Path, monkeypatch):
+        """A staged source file runs its convention-matched test without explicit mapping."""
         src_file = tmp_path / "src" / "core.py"
         src_file.parent.mkdir(parents=True, exist_ok=True)
         src_file.write_text("x = 1\n")
@@ -68,8 +67,32 @@ class TestMain:
 
         pyproject = tmp_path / "pyproject.toml"
         pyproject.write_text("""
+[tool.pytest-changed]
+""")
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["pytest-changed", "src/core.py"])
+
+        assert main() == 0
+
+    def test_source_with_explicit_mapping_overrides_convention(self, tmp_path: Path, monkeypatch):
+        """Explicit mapping wins over convention discovery for that source file."""
+        src_file = tmp_path / "src" / "core.py"
+        src_file.parent.mkdir(parents=True, exist_ok=True)
+        src_file.write_text("x = 1\n")
+
+        default_test = tmp_path / "tests" / "test_core.py"
+        default_test.parent.mkdir(parents=True, exist_ok=True)
+        default_test.write_text("def test_fail(): assert False\n")
+
+        override_test = tmp_path / "tests" / "custom" / "test_special_core.py"
+        override_test.parent.mkdir(parents=True, exist_ok=True)
+        override_test.write_text("def test_pass(): assert True\n")
+
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("""
 [tool.pytest-changed.mapping]
-"src/core.py" = ["tests/test_core.py"]
+"src/core.py" = ["tests/custom/test_special_core.py"]
 """)
 
         monkeypatch.chdir(tmp_path)
@@ -92,3 +115,40 @@ class TestMain:
         monkeypatch.setattr(sys, "argv", ["pytest-changed", "tests/test_standalone.py"])
 
         assert main() == 0
+
+    def test_unmatched_source_warns_to_stderr_by_default(
+        self, tmp_path: Path, monkeypatch, capsys
+    ):
+        """If no test matches a changed source file, pytest-changed warns on stderr."""
+        src_file = tmp_path / "src" / "missing.py"
+        src_file.parent.mkdir(parents=True, exist_ok=True)
+        src_file.write_text("x = 1\n")
+
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("""
+[tool.pytest-changed]
+""")
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["pytest-changed", "src/missing.py"])
+
+        assert main() == 0
+        assert "src/missing.py" in capsys.readouterr().err
+
+    def test_warn_on_missing_can_be_disabled(self, tmp_path: Path, monkeypatch, capsys):
+        """warn_on_missing=false suppresses unmatched-source warnings."""
+        src_file = tmp_path / "src" / "missing.py"
+        src_file.parent.mkdir(parents=True, exist_ok=True)
+        src_file.write_text("x = 1\n")
+
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("""
+[tool.pytest-changed]
+warn_on_missing = false
+""")
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["pytest-changed", "src/missing.py"])
+
+        assert main() == 0
+        assert capsys.readouterr().err == ""
