@@ -1,14 +1,10 @@
 """Config loading for pytest-changed."""
 
 import os
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-try:
-    import tomllib
-except ImportError:  # Python < 3.11
-    import tomli as tomllib  # pragma: no cover
 
 ENV_CONFIG = "PYTEST_CHANGED_CONFIG"
 CANONICAL_TOOL_KEY = "pytest-changed"
