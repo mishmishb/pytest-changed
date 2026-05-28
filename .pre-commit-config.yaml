@@ -1,15 +1,21 @@
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
+      - id: check-added-large-files
       - id: check-merge-conflict
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
+      - id: check-shebang-scripts-are-executable
       - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.0
+    rev: v0.9.9
     hooks:
       - id: ruff
         args: [--fix]
@@ -21,6 +27,22 @@ repos:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
 
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.409
+    hooks:
+      - id: pyright
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.11.0-1
+    hooks:
+      - id: shfmt
+        args: [-i, '4']
+
   - repo: local
     hooks:
       - id: bandit
@@ -28,12 +50,29 @@ repos:
         entry: uv run bandit -c pyproject.toml -r src -ll
         language: system
         pass_filenames: false
-        stages: [pre-commit]
 
-      - id: pyright
-        name: pyright (type check)
-        entry: uv run pyright
+      - id: radon-xenon
+        name: radon + xenon (complexity)
+        entry: bash -c 'uv run radon cc src -a -nb && uv run xenon --max-absolute B --max-modules B --max-average B src'
         language: system
-        args: [--project, pyproject.toml, src]
         pass_filenames: false
-        stages: [pre-commit]
+
+      - id: vulture
+        name: vulture (dead code)
+        entry: uv run vulture src --min-confidence 80
+        language: system
+        pass_filenames: false
+
+      - id: pytest-changed
+        name: pytest (changed files)
+        entry: uv run pytest-changed
+        language: system
+        pass_filenames: true
+        always_run: false
+
+      - id: pytest
+        name: pytest (full suite)
+        entry: uv run python -m pytest tests -q
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

@@ -48,6 +48,46 @@ def _discover_candidates(path: str, source_roots: list[str], test_roots: list[st
     return candidates
 
 
+def _select_tests_for_path(
+    path: str,
+    mapping: dict[str, list[str]],
+    project: Path,
+    source_roots: list[str],
+    test_roots: list[str],
+    selected: set[str],
+    unmatched: set[str],
+) -> None:
+    if _is_under_root(path, test_roots):
+        if (project / path).is_file():
+            selected.add(path)
+        return
+
+    configured = mapping.get(path)
+    if configured is not None:
+        configured_matches = {
+            _normalise(item) for item in configured if (project / item).is_file()
+        }
+        if configured_matches:
+            selected.update(configured_matches)
+        else:
+            unmatched.add(path)
+        return
+
+    discovered = {
+        candidate
+        for candidate in _discover_candidates(path, source_roots, test_roots)
+        if (project / candidate).is_file()
+    }
+    if discovered:
+        selected.update(discovered)
+    else:
+        unmatched.add(path)
+
+
+def _filter_py_files(changed: set[str]) -> set[str]:
+    return {_normalise(p) for p in changed if p.endswith(".py")}
+
+
 def target_tests(
     changed: set[str],
     mapping: dict[str, list[str]],
@@ -55,51 +95,13 @@ def target_tests(
     source_roots: list[str] | None = None,
     test_roots: list[str] | None = None,
 ) -> SelectionResult:
-    """Return selected tests and unmatched source files for the given changes.
-
-    Rules:
-    - Only .py files are considered
-    - Changed test files are auto-included
-    - Explicit mapping overrides convention discovery for that source file
-    - Convention discovery tries nested and flat test paths
-    - Only existing test files are selected
-    - Unmatched source files are reported for optional warnings upstream
-    """
     project = Path(project_root)
     selected: set[str] = set()
     unmatched: set[str] = set()
-    source_roots = source_roots or ["src"]
-    test_roots = test_roots or ["tests"]
+    src_roots = source_roots or ["src"]
+    tst_roots = test_roots or ["tests"]
 
-    for raw_path in changed:
-        path = _normalise(raw_path)
-        if not path.endswith(".py"):
-            continue
-
-        if _is_under_root(path, test_roots):
-            if (project / path).is_file():
-                selected.add(path)
-            continue
-
-        configured = mapping.get(path)
-        if configured is not None:
-            configured_matches = {
-                _normalise(item) for item in configured if (project / item).is_file()
-            }
-            if configured_matches:
-                selected.update(configured_matches)
-            else:
-                unmatched.add(path)
-            continue
-
-        discovered = {
-            candidate
-            for candidate in _discover_candidates(path, source_roots, test_roots)
-            if (project / candidate).is_file()
-        }
-        if discovered:
-            selected.update(discovered)
-        else:
-            unmatched.add(path)
+    for path in _filter_py_files(changed):
+        _select_tests_for_path(path, mapping, project, src_roots, tst_roots, selected, unmatched)
 
     return SelectionResult(tests=selected, unmatched_sources=unmatched)

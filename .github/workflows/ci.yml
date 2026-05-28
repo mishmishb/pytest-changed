@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format
+        run: uv run ruff format --check .
+
+      - name: Pyright
+        run: uv run pyright src
+
+      - name: Bandit (security SAST)
+        run: uv run bandit -c pyproject.toml -r src -ll
+
+      - name: Radon + Xenon (complexity)
+        run: uv run radon cc src -a -nb && uv run xenon --max-absolute B --max-modules B --max-average B src
+
+      - name: Vulture (dead code)
+        run: uv run vulture src --min-confidence 80
+
+      - name: Pytest
+        run: uv run python -m pytest tests -q

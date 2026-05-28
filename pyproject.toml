@@ -31,10 +31,12 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-cov",
-    "ruff",
+    "ruff>=0.9",
     "bandit",
-    "pip-audit",
-    "pyright",
+    "pyright>=1.1.409",
+    "radon>=6.0.1",
+    "xenon>=0.9.3",
+    "vulture>=2.16",
 ]
 
 [project.scripts]
@@ -65,6 +67,8 @@ skips = ["B101", "B310"]
 typeCheckingMode = "standard"
 include = ["src"]
 exclude = ["tests/**", ".venv/**"]
+reportMissingImports = true
+reportMissingTypeStubs = false
 
 [tool.hatch.version]
 source = "vcs"
