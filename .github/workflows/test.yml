@@ -37,6 +37,23 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uvx pip-audit
 
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --extra dev
+      - run: uv run radon cc src -a -nb
+      - run: uv run xenon --max-absolute B --max-modules B --max-average B src
+
+  deadcode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --extra dev
+      - run: uv run vulture src --min-confidence 80
+
   test:
     runs-on: ubuntu-latest
     strategy:
